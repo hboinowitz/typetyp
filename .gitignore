@@ -1,3 +1,4 @@
-/.pytest_cache
-/.venv
-/typetyp.egg-info
+.venv
+*.egg-info
+__pycache__
+.pytest_cache
