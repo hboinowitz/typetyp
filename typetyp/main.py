@@ -1,14 +1,19 @@
 from typing import Callable, Dict
 import typing
 
-long_forms = {'str': 'string', 'int': 'integer', 'bool': 'boolean'}
+long_forms = {'str': 'string', 'int': 'integer', 'bool': 'boolean', 'dict': 'dictionary'}
 
 def parse_single_typehint(typehint, plural_form = False):
     description = ""
     if getattr(typehint, '__module__', None) == typing.__name__:
         try: 
             type_str = typing.get_origin(typehint).__name__
-            description += type_str
+            if type_str in long_forms.keys():
+                description += long_forms[type_str]
+            else:
+                description += type_str
+            if plural_form:
+                description += 's'
         except AttributeError:
             type_str = str(typing.get_origin(typehint))
         if type_str in ['list', 'tuple']:
@@ -18,9 +23,14 @@ def parse_single_typehint(typehint, plural_form = False):
             key_subtype, value_subtype = typing.get_args(typehint)
             if len(typing.get_args(typehint)) != 2:
                 raise ValueError('Dict accepts two arguments')
-            description += (
-                f' mapping a {parse_single_typehint(key_subtype, plural_form)} to a {parse_single_typehint(value_subtype, plural_form)}'
-            )
+            if not plural_form:
+                description += (
+                    f' mapping a {parse_single_typehint(key_subtype, plural_form)} to a {parse_single_typehint(value_subtype, plural_form)}'
+                )
+            else:
+                description += (
+                    f' mapping {parse_single_typehint(key_subtype, plural_form)} to {parse_single_typehint(value_subtype, plural_form)}'
+                )
         elif type_str == 'typing.Union': 
             if str(typing.get_args(typehint)[1]) == "<class 'NoneType'>":
                 subtype = typing.get_args(typehint)[0]
