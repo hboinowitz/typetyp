@@ -39,10 +39,17 @@ def parse_single_typehint(typehint):
 def parse_type_hints(type_hints: Dict[str, typing.Type]):
     descriptions = {}
     for key, val in type_hints.items():
+        parsed_typehint = parse_single_typehint(val)
         if key == 'return':
-            descriptions[key] = f"a {parse_single_typehint(val)}"
+            if parsed_typehint.startswith('o') or parsed_typehint.startswith('i'):
+                descriptions[key] = f"an {parse_single_typehint(val)}"
+            else:
+                descriptions[key] = f"a {parse_single_typehint(val)}"
             continue
-        descriptions[key] = f"`{key}` is a {parse_single_typehint(val)}"
+        if parsed_typehint.startswith('o') or parsed_typehint.startswith('i'):
+            descriptions[key] = f"`{key}` is an {parse_single_typehint(val)}"
+        else:
+            descriptions[key] = f"`{key}` is a {parse_single_typehint(val)}"
 
     return descriptions
 
