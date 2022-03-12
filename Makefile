@@ -6,3 +6,6 @@ create_venv:
 
 install: create_venv
 	(. $(PATH_TO_ACTIVATE) && pip3 install -e .)
+
+install-jupyter: install
+	(. $(PATH_TO_ACTIVATE) && pip3 install ipykernel)
