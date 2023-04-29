@@ -94,12 +94,16 @@ def typetyps(func: Callable):
         parameters += cleaned_parameters[-1]
         descriptions += cleaned_descriptions[-1]
 
-        narration = f"`{func.__name__}` is a function accepting {num_accepted_parameters} {'parameters' if num_accepted_parameters > 1 else 'parameter'} {parameters} - {descriptions}."
+        narration = (
+            f"`{func.__name__}` is a function accepting {num_accepted_parameters} "
+            f"{'parameters' if num_accepted_parameters > 1 else 'parameter'} {parameters} -\n"
+            f"{descriptions}."
+        )
         if "return" in parsed_type_hints.keys():
-            narration += f" `{func.__name__}` returns {parsed_type_hints['return']}."
+            narration += f"\n`{func.__name__}` returns {parsed_type_hints['return']}."
     elif "return" in parsed_type_hints.keys():
         narration = (
-            f"`{func.__name__}` is a function returning {parsed_type_hints['return']}. "
+            f"`{func.__name__}` is a function returning {parsed_type_hints['return']}.\n"
             f"It does not accept any parameters."
         )
     else:
