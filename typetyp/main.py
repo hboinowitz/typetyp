@@ -1,5 +1,6 @@
 from typing import Callable, Dict
 import typing
+from functools import partial
 
 long_forms = {
     "str": "string",
@@ -9,7 +10,7 @@ long_forms = {
 }
 
 
-def parse_single_typehint(typehint, plural_form=False):
+def parse_single_typehint(typehint, plural_form=False, article=True):
     description = ""
     if getattr(typehint, "__module__", None) == typing.__name__:
         try:
@@ -29,23 +30,26 @@ def parse_single_typehint(typehint, plural_form=False):
             key_subtype, value_subtype = typing.get_args(typehint)
             if len(typing.get_args(typehint)) != 2:
                 raise ValueError("Dict accepts two arguments")
-            if not plural_form:
-                description += f" mapping a {parse_single_typehint(key_subtype, plural_form)} to a {parse_single_typehint(value_subtype, plural_form)}"
-            else:
-                description += f" mapping {parse_single_typehint(key_subtype, plural_form)} to {parse_single_typehint(value_subtype, plural_form)}"
+            description += (
+                f" mapping {parse_single_typehint(key_subtype, True)} to "
+                f"{parse_single_typehint(value_subtype, True)}"
+            )
+
         elif type_str == "typing.Union":
             if str(typing.get_args(typehint)[1]) == "<class 'NoneType'>":
                 subtype = typing.get_args(typehint)[0]
-                description += f"optional {parse_single_typehint(subtype, plural_form)}"
+                description += f"optional {parse_single_typehint(subtype, plural_form, article=False)}"
             else:
-                num_subtypes = len(typing.get_args(typehint))
-                for idx, subtype in enumerate(typing.get_args(typehint)):
-                    description += parse_single_typehint(subtype, plural_form)
-                    if idx == num_subtypes - 2:
-                        description += " or "
-                    elif idx != num_subtypes - 1:
-                        description += ", "
-        return description
+                descriptions_subtypes = list(
+                    map(
+                        partial(parse_single_typehint, plural_form=plural_form),
+                        typing.get_args(typehint)
+                    )
+                )
+                num_subtypes = len(descriptions_subtypes)
+                if num_subtypes > 1:
+                    description += f"{', '.join(descriptions_subtypes[:-1])} or "
+                description += descriptions_subtypes[-1]
     else:
         if typehint.__name__ in long_forms.keys():
             description += long_forms[typehint.__name__]
@@ -53,21 +57,19 @@ def parse_single_typehint(typehint, plural_form=False):
             description += typehint.__name__
         if plural_form:
             description += "s"
+
+    if not article or plural_form:
         return description
+    return f"{'an' if description.startswith(('a', 'o', 'i')) else 'a'} {description}"
 
 
 def parse_type_hints(type_hints: Dict[str, typing.Type]):
     descriptions = {}
     for key, val in type_hints.items():
-        parsed_typehint = parse_single_typehint(val)
         descriptions[key] = ""
         if key != "return":
             descriptions[key] = f"`{key}` is "
-        descriptions[key] += (
-            f"{'an' if parsed_typehint.startswith(('a', 'o', 'i')) else 'a'} "
-            f"{parsed_typehint}"
-        )
-
+        descriptions[key] += parse_single_typehint(val)
     return descriptions
 
 
@@ -108,6 +110,7 @@ def typetyps(func: Callable):
         )
     else:
         narration = (
-             f"`{func.__name__}` is a function that is neither returning nor accepting any parameters."
+            f"`{func.__name__}` is a function that is neither returning "
+            "nor accepting any parameters."
         )
     return narration
