@@ -1,40 +1,42 @@
 from typing import Callable, Dict
 import typing
 
-long_forms = {'str': 'string', 'int': 'integer', 'bool': 'boolean', 'dict': 'dictionary'}
+long_forms = {
+    "str": "string",
+    "int": "integer",
+    "bool": "boolean",
+    "dict": "dictionary",
+}
 
-def parse_single_typehint(typehint, plural_form = False):
+
+def parse_single_typehint(typehint, plural_form=False):
     description = ""
-    if getattr(typehint, '__module__', None) == typing.__name__:
-        try: 
+    if getattr(typehint, "__module__", None) == typing.__name__:
+        try:
             type_str = typing.get_origin(typehint).__name__
             if type_str in long_forms.keys():
                 description += long_forms[type_str]
             else:
                 description += type_str
             if plural_form:
-                description += 's'
+                description += "s"
         except AttributeError:
             type_str = str(typing.get_origin(typehint))
-        if type_str in ['list', 'tuple']:
+        if type_str in ["list", "tuple"]:
             subtype = typing.get_args(typehint)[0]
-            description += f' of {parse_single_typehint(subtype, True)}'
-        elif type_str == 'dict':
+            description += f" of {parse_single_typehint(subtype, True)}"
+        elif type_str == "dict":
             key_subtype, value_subtype = typing.get_args(typehint)
             if len(typing.get_args(typehint)) != 2:
-                raise ValueError('Dict accepts two arguments')
+                raise ValueError("Dict accepts two arguments")
             if not plural_form:
-                description += (
-                    f' mapping a {parse_single_typehint(key_subtype, plural_form)} to a {parse_single_typehint(value_subtype, plural_form)}'
-                )
+                description += f" mapping a {parse_single_typehint(key_subtype, plural_form)} to a {parse_single_typehint(value_subtype, plural_form)}"
             else:
-                description += (
-                    f' mapping {parse_single_typehint(key_subtype, plural_form)} to {parse_single_typehint(value_subtype, plural_form)}'
-                )
-        elif type_str == 'typing.Union': 
+                description += f" mapping {parse_single_typehint(key_subtype, plural_form)} to {parse_single_typehint(value_subtype, plural_form)}"
+        elif type_str == "typing.Union":
             if str(typing.get_args(typehint)[1]) == "<class 'NoneType'>":
                 subtype = typing.get_args(typehint)[0]
-                description += f'optional {parse_single_typehint(subtype, plural_form)}'
+                description += f"optional {parse_single_typehint(subtype, plural_form)}"
             else:
                 num_subtypes = len(typing.get_args(typehint))
                 for idx, subtype in enumerate(typing.get_args(typehint)):
@@ -50,51 +52,58 @@ def parse_single_typehint(typehint, plural_form = False):
         else:
             description += typehint.__name__
         if plural_form:
-            description += 's'
+            description += "s"
         return description
+
 
 def parse_type_hints(type_hints: Dict[str, typing.Type]):
     descriptions = {}
     for key, val in type_hints.items():
         parsed_typehint = parse_single_typehint(val)
-        if key == 'return':
-            if parsed_typehint.startswith('o') or parsed_typehint.startswith('i'):
-                descriptions[key] = f"an {parse_single_typehint(val)}"
-            else:
-                descriptions[key] = f"a {parse_single_typehint(val)}"
-            continue
-        if parsed_typehint.startswith('o') or parsed_typehint.startswith('i'):
-            descriptions[key] = f"`{key}` is an {parse_single_typehint(val)}"
-        else:
-            descriptions[key] = f"`{key}` is a {parse_single_typehint(val)}"
+        descriptions[key] = ""
+        if key != "return":
+            descriptions[key] = f"`{key}` is "
+        descriptions[key] += (
+            f"{'an' if parsed_typehint.startswith(('a', 'o', 'i')) else 'a'} "
+            f"{parsed_typehint}"
+        )
 
     return descriptions
 
-def typetyps(func: Callable):
-    narration = ""
-    parsed_type_hints = parse_type_hints(typing.get_type_hints(func))
-    num_accepted_parameters = len(parsed_type_hints.values())
-    if 'return' in parsed_type_hints.keys():
-        num_accepted_parameters -= 1
-    parameters = ""
-    for i in range(num_accepted_parameters):
-        parameters += f"`{list(parsed_type_hints.keys())[i]}`"
-        if i == num_accepted_parameters - 2:
-             parameters += " and "
-        elif i != num_accepted_parameters - 1:
-            parameters += ", "
-    
-    descriptions = ""
-    for i in range(num_accepted_parameters):
-        descriptions += list(parsed_type_hints.values())[i]
-        if i == num_accepted_parameters - 2:
-             descriptions += " and "
-        elif i != num_accepted_parameters - 1:
-            descriptions += ", "
 
-    narration += (
-        f"`{func.__name__}` is a function accepting {num_accepted_parameters} {'parameters' if num_accepted_parameters > 1 else 'parameter'} {parameters} -  {descriptions}."
+def typetyps(func: Callable):
+    parsed_type_hints = parse_type_hints(typing.get_type_hints(func))
+    cleaned_parsed_typehints = {
+        param: parsed
+        for param, parsed in parsed_type_hints.items()
+        if param != "return"
+    }
+
+    cleaned_parameters = list(
+        map(lambda x: f"`{x}`", list(cleaned_parsed_typehints.keys()))
     )
-    if 'return' in parsed_type_hints.keys():
-        narration += f"`{func.__name__}` returns {parsed_type_hints['return']}"
+    cleaned_descriptions = list(cleaned_parsed_typehints.values())
+    num_accepted_parameters = len(cleaned_parameters)
+
+    if num_accepted_parameters:
+        parameters = ""
+        descriptions = ""
+        if num_accepted_parameters > 1:
+            parameters += f"{', '.join(cleaned_parameters[:-1])} and "
+            descriptions += f"{', '.join(cleaned_descriptions[:-1])} and "
+        parameters += cleaned_parameters[-1]
+        descriptions += cleaned_descriptions[-1]
+
+        narration = f"`{func.__name__}` is a function accepting {num_accepted_parameters} {'parameters' if num_accepted_parameters > 1 else 'parameter'} {parameters} - {descriptions}."
+        if "return" in parsed_type_hints.keys():
+            narration += f" `{func.__name__}` returns {parsed_type_hints['return']}."
+    elif "return" in parsed_type_hints.keys():
+        narration = (
+            f"`{func.__name__}` is a function returning {parsed_type_hints['return']}. "
+            f"It does not accept any parameters."
+        )
+    else:
+        narration = (
+             f"`{func.__name__}` is a function that is neither returning nor accepting any parameters."
+        )
     return narration
